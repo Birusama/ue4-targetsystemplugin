@@ -158,7 +158,7 @@ clean:
 	rm -rf $(WORKDIR)
 
 clean-build: 
-	rm -rf $(WORKDIR)
+	rm -rf $(BUILD_DIR)
 
 # ## make clean-binaries
 #
