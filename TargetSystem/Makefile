@@ -1,36 +1,39 @@
-# Unreal Engine Plugin Makefile (Windows / PowerShell)
-#
-# Assumes Makefile is put next to .uplugin file, and make run at the root of plugin directory
-#
-# Tweak UE_ROOT and PLUGIN_NAME to your setup.
-#
-# Some requirements:
-#
-# - Powershell
-# - jq (https://github.com/jqlang/jq) - choco install jq
-# - nodejs (https://nodejs.org)
+WORKDIR = .work
+UE_VERSION := 5.8
 
-# Variables
-# ---------
-#
-# Nice read on Makefile variables: https://earthly.dev/blog/makefile-variables/
+ifeq ($(OS),Windows_NT)
+
+SHELL := pwsh.exe
+.SHELLFLAGS := -NoProfile -Command
 
 # Current working directory - Works in Windows cmd or Make
-CWD := $(shell echo %CD%)
-HOME := $(shell echo %USERPROFILE%)
-
-WORKDIR = .work
-WORKDIR_ABSOLUTE = $(CWD)/$(WORKDIR)
+CWD := $(shell (Get-Item .).FullName)
+PWD := $(shell (Get-Item .).FullName -replace '\\', '/')
 
 # Change to your Unreal Engine root path
-# UE_ROOT := C:/Path/To/UnrealEngine
-UE_VERSION := 5.7
 UE_ROOT := E:/Engines/UE_$(UE_VERSION)
 
 UAT = $(UE_ROOT)/Engine/Build/BatchFiles/RunUAT.bat
 UBT = $(UE_ROOT)/Engine/Build/BatchFiles/Build.bat
 UE_EDITOR = $(UE_ROOT)/Engine/Binaries/Win64/UnrealEditor.exe
 UE_CMD = $(UE_ROOT)/Engine/Binaries/Win64/UnrealEditor-Cmd.exe
+
+else
+
+CWD := $(shell pwd)
+PWD := $(CWD)
+
+# Change to your Unreal Engine root path
+UE_ROOT := /Volumes/dev/Engines/UE_$(UE_VERSION)
+
+UAT = $(UE_ROOT)/Engine/Build/BatchFiles/RunUAT.sh
+UBT = $(UE_ROOT)/Engine/Build/BatchFiles/Build.sh
+UE_EDITOR = $(UE_ROOT)/Engine/Binaries/Mac/UnrealEditor
+UE_CMD = $(UE_ROOT)/Engine/Binaries/Win64/UnrealEditor-Cmd
+endif
+
+WORKDIR_ABSOLUTE = $(CWD)/$(WORKDIR)
+BUILD_DIR = $(WORKDIR)/$(UE_VERSION)
 
 # Change to your plugin name
 PLUGIN_NAME := TargetSystem
@@ -80,18 +83,15 @@ ubt:
 #
 # May want to add --strict-includes with: make build UAT_FLAGS="-StrictIncludes" 
 
-BUILD_DIR = $(WORKDIR)/$(UE_VERSION)
-
 # sleep 2 at the end to workaround a conflicting unreal instance build tool error
-$(BUILD_DIR):
+$(BUILD_DIR): clean-build
 	@echo "Building plugin $(PLUGIN_NAME)..."
-	powershell -Command "New-Item $(WORKDIR) -ItemType Directory -Force"
-	"$(UAT)" BuildPlugin \
+	$(UAT) BuildPlugin \
 		-Plugin="$(PLUGIN_DIR)/$(PLUGIN_NAME).uplugin" \
-		-TargetPlatforms=Win64 \
+		-TargetPlatforms=Mac \
+		-Architecture_Mac=arm64 \
 		-Package="$(CWD)/$(BUILD_DIR)" \
 		$(UAT_FLAGS)
-	powershell -Command 'sleep 2'
 
 build: $(BUILD_DIR)
 
@@ -155,7 +155,10 @@ logs:
 #
 # Clean build artifacts
 clean: 
-	powershell -Command "if (Test-Path $(WORKDIR)) { Remove-Item -Recurse -Force $(WORKDIR) }"
+	rm -rf $(WORKDIR)
+
+clean-build: 
+	rm -rf $(WORKDIR)
 
 # ## make clean-binaries
 #
